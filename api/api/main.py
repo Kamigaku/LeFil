@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from structure.models import init_pool, close_pool
@@ -54,3 +55,7 @@ app.include_router(status.router,   prefix="/entries",  tags=["status"])
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+def start():
+    """Launched with `poetry run start` at root level"""
+    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
