@@ -4,15 +4,13 @@ api/config.py — Configuration centralisée via variables d'environnement.
 
 from __future__ import annotations
 
-import os
-
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     # Base de données
-    database_url: str = os.getenv("DATABASE_URL")
+    database_url: str = Field(..., alias="DATABASE_URL")
 
     # JWT
     secret_key: str = Field(..., alias="SECRET_KEY")
