@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Iterator, Any
 
 import httpx
+from structure.models.db import EntryRepository
 from structure.models.entry import Entry
 
 from scraper.base import BaseScraper
@@ -100,6 +101,10 @@ class RedditScraper(BaseScraper):
                     if url is None or permalink is None:
                         continue
                     if permalink in url:
+                        continue
+
+                    if EntryRepository().entry_exist_by_link(url):
+                        logger.debug(f"[reddit] {url} already exists, skipping.")
                         continue
 
                     # On ne lit pas les images
