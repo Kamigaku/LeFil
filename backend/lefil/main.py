@@ -106,18 +106,14 @@ async def main(debug: bool = False):
     # GitHub Releases
     runner.register(GitHubTrendingsScraper())
 
-    keep_retrieving = True
-    while keep_retrieving:
-        init_pool(settings.database_url)
-        try:
-            entries = await runner.run_all()
-            EntryRepository().upsert_many(entries=entries)
-        except Exception as e:
-            keep_retrieving = False
-            logger.error(f"Error during the loop", exc_info=e)
-        finally:
-            close_pool()
-        await asyncio.sleep(C__DEFAULT_SLEEP_TIME_IN_S)
+    init_pool(settings.database_url)
+    try:
+        entries = await runner.run_all()
+        EntryRepository().upsert_many(entries=entries)
+    except Exception as e:
+        logger.error(f"Error during the loop", exc_info=e)
+    finally:
+        close_pool()
 
 
 if __name__ == "__main__":
