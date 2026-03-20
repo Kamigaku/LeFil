@@ -12,7 +12,7 @@ from structure.models.entry import Entry
 
 from scraper.base import BaseScraper
 
-from lefil.scraper.helper import get_dict_value
+from scraper.helper import get_dict_value
 from scraper.operations import extract
 
 logger = logging.getLogger("lefil.scraper.scrapers.hackernews")
