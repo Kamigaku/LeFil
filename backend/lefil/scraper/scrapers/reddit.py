@@ -131,7 +131,7 @@ class RedditScraper(BaseScraper):
             title=get_dict_value(post, "title", default=None),
             description=get_dict_value(post, "description", default=None),
             keywords=[],
-            published_at=get_dict_value(post, "created_utc", modifier=lambda d: datetime.fromtimestamp(d, tz=timezone.utc)),
+            published_at=datetime.now(timezone.utc),
             metadata={
                 "subreddit": subreddit_name,
                 "score": get_dict_value(post, "score", modifier=str, default=None),

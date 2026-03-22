@@ -150,7 +150,7 @@ class HackerNewsScraper(BaseScraper):
                 link=url,
                 title=title,
                 description=item.get("description", ""),
-                published_at=datetime.fromtimestamp(item["time"], tz=timezone.utc),
+                published_at=datetime.now(timezone.utc),
                 keywords=[],
                 metadata={
                     "hn_id": str(item["id"]),
