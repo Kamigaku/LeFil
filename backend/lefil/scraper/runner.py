@@ -96,7 +96,7 @@ class ScraperRunner:
         for i in range(len(active_tasks)):
             try:
                 result = active_tasks[i][1].result()
-                if result is None:
+                if result is None or result[0] == "Not related":
                     logger.info(f"[runner] Adding entry {active_tasks[i][0].link} to the blacklist.")
                     with open(C__DEFAULT_BLACKLIST_FILE, mode="a+", encoding="utf-8") as f:
                         f.write(f"{active_tasks[i][0].link}{os.linesep}")
