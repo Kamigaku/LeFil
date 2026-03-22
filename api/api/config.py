@@ -20,13 +20,13 @@ class Settings(BaseSettings):
     # Google OAuth
     google_client_id: str = Field(..., alias="GOOGLE_CLIENT_ID")
     google_client_secret: str = Field(..., alias="GOOGLE_CLIENT_SECRET")
-    google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
+    google_redirect_uri: str = Field(..., alias="GOOGLE_REDIRECT_URI")
 
     # CORS — origines autorisées (frontend Next.js)
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] = Field(..., alias="CORS_ORIGINS")
 
     # URL publique du frontend (pour les redirections OAuth)
-    frontend_url: str = "http://localhost:3000"
+    frontend_url: str = Field(..., alias="FRONTEND_URL")
 
     class Config:
         env_file = ".env"
