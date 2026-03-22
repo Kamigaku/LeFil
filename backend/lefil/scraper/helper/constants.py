@@ -1,8 +1,11 @@
+import typing
+
 from structure.meta import SingletonMeta
 from structure.models.summarizer import Summarizer
 
 
 C__DEFAULT_SLEEP_TIME_IN_S: int = 60 * 5
+C__DEFAULT_BLACKLIST_FILE: typing.Final[str] = "blacklist.txt"
 
 
 class ApplicationContext(metaclass=SingletonMeta):

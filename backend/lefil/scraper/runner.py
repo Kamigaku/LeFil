@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import logging
+import os
 from asyncio import TaskGroup, Task
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from structure.models.entry import Entry
 
 from scraper.base import BaseScraper
-from scraper.helper.constants import context
+from scraper.helper.constants import context, C__DEFAULT_BLACKLIST_FILE
 
 logger = logging.getLogger("lefil.scraper.runner")
 
@@ -77,8 +78,15 @@ class ScraperRunner:
         # Ici on va venir filter toutes les entries et changer la description
         active_tasks: list[tuple[Entry, Task]] = []
         entries_to_return: list[Entry] = []
+
+        # Read the blacklist files
+        with open(C__DEFAULT_BLACKLIST_FILE, "r", encoding="utf-8") as f:
+            blacklisted_links = f.read().splitlines()
+
         async with TaskGroup() as tg:
             for i in range(len(all_entries)):
+                if all_entries[i].link in blacklisted_links:
+                    continue
                 if all_entries[i].summarize_description:
                     active_tasks.append((all_entries[i],
                                          tg.create_task(context.summarizer.summarize(all_entries[i].link))))
@@ -89,6 +97,8 @@ class ScraperRunner:
             try:
                 result = active_tasks[i][1].result()
                 if result is None:
+                    with open(C__DEFAULT_BLACKLIST_FILE, mode="a+", encoding="utf-8") as f:
+                        f.write(f"{active_tasks[i][0].link}{os.linesep}")
                     continue
                 active_tasks[i][0].description = result[0]
                 active_tasks[i][0].keywords = result[1]

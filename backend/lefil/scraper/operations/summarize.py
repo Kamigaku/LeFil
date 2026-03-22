@@ -109,6 +109,9 @@ The summary must:
 - Explain what is new, changed, or technically important.
 - Include concrete numbers, benchmarks, or findings if they appear in the article.
 
+Specific rule :
+- The content should be related to programming or technology surronding programming. If the content doesn't relate to those subject, give the answer "Not related".
+
 Style requirements:
 - Write in plain, factual English.
 - Do not start with phrases such as "This article", "The author", or similar meta references.

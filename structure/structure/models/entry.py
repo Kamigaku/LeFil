@@ -29,14 +29,6 @@ class Entry(BaseModel):
     metadata: dict[str, str]
     summarize_description: bool = True
 
-    @field_validator("origin")
-    @classmethod
-    def origin_must_be_known(cls, v: str) -> str:
-        allowed = {"reddit", "hackernews", "github", "rss"}
-        if v not in allowed:
-            raise ValueError(f"Origin '{v}' non reconnue. Valeurs acceptées : {allowed}")
-        return v
-
     @field_validator("description")
     @classmethod
     def description_not_empty(cls, v: str) -> str:
