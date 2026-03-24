@@ -97,14 +97,16 @@ async def main(debug: bool = False):
         )
     )
 
-    # # HackerNews (pas de clé requise)
+    # HackerNews (pas de clé requise)
     runner.register(HackerNewsScraper(config={
-        "min_score": 30,
+        "min_score": 80,
         "limit": 10
     }))
 
     # GitHub Releases
     runner.register(GitHubTrendingsScraper())
+
+    # runner.register(DevToScraper())
 
     init_pool(settings.database_url)
     try:
