@@ -1,19 +1,16 @@
 /**
  * hooks/useInfiniteFeed.ts — Hook de pagination infinie.
- *
- * Gère l'accumulation des pages, le curseur et le chargement.
- * Utilisé par le composant Feed avec IntersectionObserver.
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { getFeed, Entry, FeedParams } from "@/lib/api";
 
 interface FeedState {
-  entries:    Entry[];
-  hasMore:    boolean;
-  loading:    boolean;
+  entries:     Entry[];
+  hasMore:     boolean;
+  loading:     boolean;
   loadingMore: boolean;
-  error:      string | null;
+  error:       string | null;
 }
 
 export function useInfiniteFeed(params: Omit<FeedParams, "cursor"> = {}) {
@@ -25,11 +22,17 @@ export function useInfiniteFeed(params: Omit<FeedParams, "cursor"> = {}) {
     error:       null,
   });
 
-  const cursorRef    = useRef<string | null>(null);
-  const paramsRef    = useRef(params);
-  paramsRef.current  = params;
+  const cursorRef     = useRef<string | null>(null);
+  const paramsRef     = useRef(params);
+  paramsRef.current   = params;
 
-  // Charge la première page (ou recharge depuis le début)
+  // Refs stables pour éviter les captures de closure périmées dans l'observer
+  const hasMoreRef     = useRef(true);
+  const loadingMoreRef = useRef(false);
+
+  hasMoreRef.current     = state.hasMore;
+  loadingMoreRef.current = state.loadingMore;
+
   const load = useCallback(async () => {
     setState(s => ({ ...s, loading: true, error: null }));
     cursorRef.current = null;
@@ -48,7 +51,6 @@ export function useInfiniteFeed(params: Omit<FeedParams, "cursor"> = {}) {
     }
   }, []);
 
-  // Charge la page suivante (appelé par IntersectionObserver)
   const loadMore = useCallback(async () => {
     if (!cursorRef.current) return;
     setState(s => ({ ...s, loadingMore: true }));
@@ -61,7 +63,7 @@ export function useInfiniteFeed(params: Omit<FeedParams, "cursor"> = {}) {
       cursorRef.current = page.next_cursor;
       setState(s => ({
         ...s,
-        entries:     [...s.entries, ...page.items],
+        entries:     [...s.entries, ...page.items],   // ← append, jamais replace
         hasMore:     page.has_more,
         loadingMore: false,
       }));
@@ -70,7 +72,44 @@ export function useInfiniteFeed(params: Omit<FeedParams, "cursor"> = {}) {
     }
   }, []);
 
-  // Met à jour un article dans le state local (optimistic update)
+  // Ref stable vers loadMore pour l'observer
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+
+  // Expose une ref stable pour le sentinel — l'observer lit hasMore/loadingMore
+  // depuis les refs, pas depuis des closures capturées, ce qui évite les
+  // déclenchements parasites qui appelaient load() au lieu de loadMore()
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect();
+
+    observerRef.current = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMoreRef.current && !loadingMoreRef.current) {
+          loadMoreRef.current();
+        }
+      },
+      { rootMargin: "300px" },
+    );
+
+    if (sentinelRef.current) {
+      observerRef.current.observe(sentinelRef.current);
+    }
+
+    return () => { observerRef.current?.disconnect(); };
+  }, []); // ← dépendances vides : l'observer est créé une seule fois
+
+  // Callback ref passé au sentinel dans le JSX
+  const loaderRef = useCallback((node: HTMLDivElement | null) => {
+    sentinelRef.current = node;
+    if (node && observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current.observe(node);
+    }
+  }, []);
+
   const updateEntry = useCallback((id: string, patch: Partial<Entry>) => {
     setState(s => ({
       ...s,
@@ -78,7 +117,6 @@ export function useInfiniteFeed(params: Omit<FeedParams, "cursor"> = {}) {
     }));
   }, []);
 
-  // Retire un article du feed (masqué)
   const removeEntry = useCallback((id: string) => {
     setState(s => ({
       ...s,
@@ -86,5 +124,5 @@ export function useInfiniteFeed(params: Omit<FeedParams, "cursor"> = {}) {
     }));
   }, []);
 
-  return { ...state, load, loadMore, updateEntry, removeEntry };
+  return { ...state, load, loadMore, loaderRef, updateEntry, removeEntry };
 }

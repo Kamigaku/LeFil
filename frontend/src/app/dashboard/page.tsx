@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTheme, palette } from "@/lib/theme";
@@ -61,7 +61,7 @@ export default function Dashboard() {
     only_saved:  filter === "saved",
   };
 
-  const { entries: rawEntries, hasMore, loading, loadingMore, load, loadMore, updateEntry, removeEntry } =
+  const { entries: rawEntries, hasMore, loading, loadingMore, load, loadMore, loaderRef, updateEntry, removeEntry } =
     useInfiniteFeed(feedParams);
 
   const entries = filter === "filtered"
@@ -69,21 +69,6 @@ export default function Dashboard() {
     : rawEntries;
 
   useEffect(() => { if (user) load(); }, [filter, user]);
-
-  // ── Infinite scroll : callback ref pour éviter le problème de null ──────────
-  // L'IntersectionObserver est attaché directement quand l'élément apparaît dans le DOM,
-  // pas dans un useEffect qui pourrait rater l'élément s'il est conditionnel.
-  const observerRef = useRef<IntersectionObserver | null>(null);
-
-  const loaderRef = useCallback((node: HTMLDivElement | null) => {
-    if (observerRef.current) observerRef.current.disconnect();
-    if (!node) return;
-    observerRef.current = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting && hasMore && !loadingMore) loadMore(); },
-      { rootMargin: "300px" },
-    );
-    observerRef.current.observe(node);
-  }, [hasMore, loadingMore, loadMore]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
