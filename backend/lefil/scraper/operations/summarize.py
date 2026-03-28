@@ -110,7 +110,7 @@ The summary must:
 - Include concrete numbers, benchmarks, or findings if they appear in the article.
 
 Specific rule :
-- The content should be related to programming or technology surronding programming. If the content doesn't relate to those subject, give the answer "Not related".
+- The content should be related to programming or with close connection to programming. If the content doesn't relate to those subject, give the answer "Not related".
 
 Style requirements:
 - Write in plain, factual English.
