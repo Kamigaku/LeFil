@@ -1,128 +1,102 @@
 /**
  * hooks/useInfiniteFeed.ts — Hook de pagination infinie.
+ *
+ * Utilise un mutex (isLoadingRef) pour garantir qu'on ne peut jamais
+ * avoir load() et loadMore() qui tournent en même temps, et que
+ * loadMore() utilise toujours setState fonctionnel pour ne jamais
+ * écraser les entrées existantes.
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { getFeed, Entry, FeedParams } from "@/lib/api";
 
-interface FeedState {
-  entries:     Entry[];
-  hasMore:     boolean;
-  loading:     boolean;
-  loadingMore: boolean;
-  error:       string | null;
-}
-
 export function useInfiniteFeed(params: Omit<FeedParams, "cursor"> = {}) {
-  const [state, setState] = useState<FeedState>({
-    entries:     [],
-    hasMore:     true,
-    loading:     true,
-    loadingMore: false,
-    error:       null,
-  });
+  const [entries,     setEntries]     = useState<Entry[]>([]);
+  const [hasMore,     setHasMore]     = useState(true);
+  const [loading,     setLoading]     = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error,       setError]       = useState<string | null>(null);
 
-  const cursorRef     = useRef<string | null>(null);
-  const paramsRef     = useRef(params);
-  paramsRef.current   = params;
+  const cursorRef    = useRef<string | null>(null);
+  const paramsRef    = useRef(params);
+  paramsRef.current  = params;
 
-  // Refs stables pour éviter les captures de closure périmées dans l'observer
-  const hasMoreRef     = useRef(true);
-  const loadingMoreRef = useRef(false);
+  // Mutex : empêche load() et loadMore() de se chevaucher
+  const isLoadingRef = useRef(false);
+  // Refs pour l'observer (évite les closures périmées)
+  const hasMoreRef   = useRef(true);
+  hasMoreRef.current = hasMore;
 
-  hasMoreRef.current     = state.hasMore;
-  loadingMoreRef.current = state.loadingMore;
+  // ── Charge la première page ──────────────────────────────────────────────
 
   const load = useCallback(async () => {
-    setState(s => ({ ...s, loading: true, error: null }));
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
+    setLoading(true);
+    setError(null);
     cursorRef.current = null;
+
     try {
       const page = await getFeed({ ...paramsRef.current, limit: 20 });
       cursorRef.current = page.next_cursor;
-      setState({
-        entries:     page.items,
-        hasMore:     page.has_more,
-        loading:     false,
-        loadingMore: false,
-        error:       null,
-      });
+      setEntries(page.items);          // ← seul endroit où on REMPLACE
+      setHasMore(page.has_more);
     } catch (e: any) {
-      setState(s => ({ ...s, loading: false, error: e.message }));
+      setError(e.message);
+    } finally {
+      setLoading(false);
+      isLoadingRef.current = false;
     }
   }, []);
 
+  // ── Charge la page suivante ───────────────────────────────────────────────
+
   const loadMore = useCallback(async () => {
-    if (!cursorRef.current) return;
-    setState(s => ({ ...s, loadingMore: true }));
+    // Triple garde : mutex + cursor + hasMore
+    if (isLoadingRef.current || !cursorRef.current || !hasMoreRef.current) return;
+    isLoadingRef.current = true;
+    setLoadingMore(true);
+
     try {
       const page = await getFeed({
         ...paramsRef.current,
-        cursor: cursorRef.current!,
+        cursor: cursorRef.current,
         limit:  20,
       });
       cursorRef.current = page.next_cursor;
-      setState(s => ({
-        ...s,
-        entries:     [...s.entries, ...page.items],   // ← append, jamais replace
-        hasMore:     page.has_more,
-        loadingMore: false,
-      }));
+      // setState fonctionnel : toujours basé sur la valeur la plus récente
+      // → impossible d'écraser des entrées déjà présentes
+      setEntries(prev => [...prev, ...page.items]);
+      setHasMore(page.has_more);
     } catch (e: any) {
-      setState(s => ({ ...s, loadingMore: false, error: e.message }));
+      setError(e.message);
+    } finally {
+      setLoadingMore(false);
+      isLoadingRef.current = false;
     }
   }, []);
 
-  // Ref stable vers loadMore pour l'observer
+  // ── Ref stable pour loadMore (lue par l'observer) ────────────────────────
+
   const loadMoreRef = useRef(loadMore);
   loadMoreRef.current = loadMore;
 
-  // Expose une ref stable pour le sentinel — l'observer lit hasMore/loadingMore
-  // depuis les refs, pas depuis des closures capturées, ce qui évite les
-  // déclenchements parasites qui appelaient load() au lieu de loadMore()
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
+  // ── Sentinel ref : simple useRef, l'observer est créé dans le composant ──
 
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect();
+  const loaderRef = useRef<HTMLDivElement | null>(null);
 
-    observerRef.current = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && hasMoreRef.current && !loadingMoreRef.current) {
-          loadMoreRef.current();
-        }
-      },
-      { rootMargin: "300px" },
-    );
-
-    if (sentinelRef.current) {
-      observerRef.current.observe(sentinelRef.current);
-    }
-
-    return () => { observerRef.current?.disconnect(); };
-  }, []); // ← dépendances vides : l'observer est créé une seule fois
-
-  // Callback ref passé au sentinel dans le JSX
-  const loaderRef = useCallback((node: HTMLDivElement | null) => {
-    sentinelRef.current = node;
-    if (node && observerRef.current) {
-      observerRef.current.disconnect();
-      observerRef.current.observe(node);
-    }
-  }, []);
+  // ── Optimistic updates ───────────────────────────────────────────────────
 
   const updateEntry = useCallback((id: string, patch: Partial<Entry>) => {
-    setState(s => ({
-      ...s,
-      entries: s.entries.map(e => e.id === id ? { ...e, ...patch } : e),
-    }));
+    setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
   }, []);
 
   const removeEntry = useCallback((id: string) => {
-    setState(s => ({
-      ...s,
-      entries: s.entries.filter(e => e.id !== id),
-    }));
+    setEntries(prev => prev.filter(e => e.id !== id));
   }, []);
 
-  return { ...state, load, loadMore, loaderRef, updateEntry, removeEntry };
+  return {
+    entries, hasMore, loading, loadingMore, error,
+    load, loadMore, loaderRef, updateEntry, removeEntry,
+  };
 }

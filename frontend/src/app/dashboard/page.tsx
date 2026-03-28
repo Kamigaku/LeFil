@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTheme, palette } from "@/lib/theme";
@@ -69,6 +69,21 @@ export default function Dashboard() {
     : rawEntries;
 
   useEffect(() => { if (user) load(); }, [filter, user]);
+
+  // ── IntersectionObserver — créé une fois, lit loadMore via ref ──────────────
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+
+  useEffect(() => {
+    const sentinel = loaderRef.current;
+    if (!sentinel) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadMoreRef.current(); },
+      { rootMargin: "400px" },
+    );
+    obs.observe(sentinel);
+    return () => obs.disconnect();
+  }, [entries.length]); // re-attache quand la liste grandit (sentinel toujours présent)
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
